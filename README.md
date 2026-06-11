@@ -1,5 +1,7 @@
 # bcsv (R)
 
+[![R-CMD-check](https://github.com/behaverse/bcsv-r/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/behaverse/bcsv-r/actions/workflows/R-CMD-check.yaml)
+
 R package to read, write, document, and validate CSV files paired with [**bcsv**](https://behaverse.org/schemas/bcsv/) (Better CSV) metadata.
 
 bcsv is a JSON-LD extension of W3C CSVW that adds first-class categorical/ordered factors, units, multiple NA codes, file-integrity hashes (SHA-256), and a few documentation properties. Pure-CSVW readers ignore the bcsv additions; bcsv-aware readers get typed factors and dates out of the box.
