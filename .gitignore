@@ -1,0 +1,11 @@
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+*.Rcheck/
+bcsv_*.tar.gz
+vignettes/bcsv_files/
+vignettes/bcsv.html
+inst/doc/
+.quarto/
+.DS_Store

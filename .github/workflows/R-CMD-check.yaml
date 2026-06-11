@@ -1,0 +1,54 @@
+name: R-CMD-check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  R-CMD-check:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
+    steps:
+      # Nested two levels deep so the conformance suite finds the schema repo
+      # four directories above tests/testthat, the same layout as local
+      # development.
+      - name: Check out bcsv-r
+        uses: actions/checkout@v4
+        with:
+          path: pkg/bcsv-r
+
+      - name: Check out the bcsv schema + conformance fixtures
+        uses: actions/checkout@v4
+        with:
+          repository: behaverse/schemas
+          path: behaverse-schemas
+
+      - name: Conformance fixtures present
+        run: test -d behaverse-schemas/bcsv/conformance
+
+      - uses: quarto-dev/quarto-actions/setup@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          working-directory: pkg/bcsv-r
+          extra-packages: any::rcmdcheck, any::devtools
+
+      - name: Run test suite (includes cross-language conformance)
+        working-directory: pkg/bcsv-r
+        run: Rscript -e 'devtools::test(stop_on_failure = TRUE)'
+
+      # R CMD check runs from its own directory, so the conformance fixtures
+      # are out of reach there; the suite skips them and the step above is the
+      # authoritative conformance gate.
+      - uses: r-lib/actions/check-r-package@v2
+        with:
+          working-directory: pkg/bcsv-r
+          args: 'c("--no-manual", "--as-cran")'
+          upload-snapshots: true

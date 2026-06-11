@@ -1,0 +1,6 @@
+"id","name","age","score","rating","passed","date"
+1,"Alice",25,85.5,"good",TRUE,2025-01-15
+2,"Bob",30,92,"very good",TRUE,2025-01-16
+3,"Carol",35,58.5,"bad",FALSE,2025-01-17
+4,"Dave",28,71,"good",TRUE,2025-01-18
+5,"Eve",42,40,"very bad",FALSE,2025-01-19

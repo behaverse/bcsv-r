@@ -1,0 +1,61 @@
+{
+  "@context": "https://behaverse.org/schemas/bcsv/context.jsonld",
+  "@type": "csvw:Table",
+  "name": "laboratory-measurements",
+  "pretty_name": "Laboratory Measurements Dataset",
+  "description": "Chemical analysis measurements from environmental samples across different site types",
+  "date_created": "2025-01-15",
+  "creator": "Lab Team",
+  "url": "measurements.csv",
+  "table_schema": {
+    "primary_key": "sample_id",
+    "columns": [
+      {
+        "name": "sample_id",
+        "label": "Sample ID",
+        "datatype": "string",
+        "description": "Unique identifier for each sample"
+      },
+      {
+        "name": "timestamp",
+        "label": "Measurement Time",
+        "datatype": "datetime",
+        "format": "yyyy-MM-dd'T'HH:mm:ss'Z'",
+        "description": "Date and time when measurement was taken (UTC)"
+      },
+      {
+        "name": "temperature",
+        "label": "Temperature",
+        "datatype": "number",
+        "minimum": -20,
+        "maximum": 100,
+        "unit": "°C",
+        "description": "Sample temperature at time of measurement"
+      },
+      {
+        "name": "ph",
+        "label": "pH Level",
+        "datatype": "number",
+        "minimum": 0,
+        "maximum": 14,
+        "description": "Acidity/alkalinity measured on pH scale"
+      },
+      {
+        "name": "concentration",
+        "label": "Analyte Concentration",
+        "datatype": "number",
+        "unit": "mol/L",
+        "null": [""],
+        "na_strings": ["BDL", "Below Detection Limit"],
+        "description": "Concentration of target analyte in mol/L (BDL = Below Detection Limit)"
+      },
+      {
+        "name": "site_type",
+        "label": "Site Type",
+        "datatype": "categorical",
+        "description": "Type of sampling site",
+        "levels": ["urban", "rural", "industrial"]
+      }
+    ]
+  }
+}

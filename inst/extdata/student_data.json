@@ -1,0 +1,65 @@
+{
+  "@context": "https://behaverse.org/schemas/bcsv/context.jsonld",
+  "@type": "csvw:Table",
+  "name": "student-test-results",
+  "pretty_name": "Student Test Results",
+  "description": "Test results for students including scores and grades",
+  "date_created": "2025-11-29",
+  "creator": "Data Team",
+  "url": "student_data.csv",
+  "file_hash": "607e585a0785b8c94004cc5c7baf1304bb69b00dced6906e30f9e0203e090c6e",
+  "table_schema": {
+    "columns": [
+      {
+        "name": "id",
+        "label": "Id",
+        "datatype": "integer",
+        "description": "Unique student identifier"
+      },
+      {
+        "name": "name",
+        "label": "Name",
+        "datatype": "string",
+        "description": "Student name"
+      },
+      {
+        "name": "age",
+        "label": "Age",
+        "datatype": "number",
+        "description": "Student age in years",
+        "unit": "years",
+        "minimum": 0,
+        "maximum": 120
+      },
+      {
+        "name": "score",
+        "label": "Score",
+        "datatype": "number",
+        "description": "Test score percentage",
+        "unit": "%",
+        "minimum": 0,
+        "maximum": 100
+      },
+      {
+        "name": "grade",
+        "label": "Grade",
+        "datatype": "ordered",
+        "levels": ["F", "D", "C", "B", "A"],
+        "description": "Letter grade (A-F, ordered from worst to best)"
+      },
+      {
+        "name": "passed",
+        "label": "Passed",
+        "datatype": "boolean",
+        "description": "Whether student passed the test"
+      },
+      {
+        "name": "test_date",
+        "label": "Test Date",
+        "datatype": "date",
+        "format": "yyyy-MM-dd",
+        "description": "Date when test was taken"
+      }
+    ]
+  }
+}

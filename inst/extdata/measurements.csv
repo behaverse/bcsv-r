@@ -1,0 +1,7 @@
+sample_id,timestamp,temperature,ph,concentration,site_type
+S001,2025-01-15T09:30:00Z,23.5,7.2,0.045,urban
+S002,2025-01-15T10:15:00Z,24.1,7.4,0.052,rural
+S003,2025-01-15T11:00:00Z,22.8,6.9,BDL,urban
+S004,2025-01-15T14:30:00Z,25.3,7.6,0.038,industrial
+S005,2025-01-15T15:45:00Z,23.9,7.1,0.041,rural
+S006,2025-01-15T16:20:00Z,24.5,7.3,BDL,urban

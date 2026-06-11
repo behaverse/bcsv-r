@@ -1,0 +1,32 @@
+Package: bcsv
+Type: Package
+Title: Read, Write, Document, and Validate Better CSV Files
+Version: 0.1.0.9000
+Authors@R: c(
+    person("Behaverse", role = c("aut", "cre"), email = "noreply@behaverse.org"))
+Description: Tools for working with CSV files paired with bcsv (Better CSV)
+    metadata, a JSON-LD extension of W3C CSVW. Reads typed columns (including
+    ordered/unordered factors, units, multiple NA codes), writes paired CSV +
+    metadata with SHA-256 integrity hashes, generates draft metadata from a
+    tibble, and validates a CSV against its metadata. Stays in lock-step with
+    the Python 'bcsv' package; both implementations are exercised against a
+    shared conformance fixture suite.
+License: MIT + file LICENSE
+URL: https://behaverse.org/schemas/bcsv/
+BugReports: https://github.com/behaverse/bcsv-r/issues
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Imports:
+    digest,
+    jsonlite,
+    jsonvalidate,
+    readr,
+    tibble,
+    yaml
+Suggests:
+    hms,
+    testthat (>= 3.0.0),
+    quarto
+VignetteBuilder: quarto
+Config/testthat/edition: 3
+Config/roxygen2/version: 8.0.0

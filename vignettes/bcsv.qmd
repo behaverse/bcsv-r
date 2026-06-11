@@ -1,0 +1,381 @@
+---
+title: "Getting started with bcsv"
+format:
+  html:
+    df-print: kable
+vignette: >
+  %\VignetteIndexEntry{Getting started with bcsv}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+---
+
+`bcsv` reads and writes CSV files paired with a **bcsv** metadata sidecar—a
+JSON-LD extension of W3C CSVW that adds ordered/categorical factors, units,
+multiple NA codes, and a SHA-256 integrity hash. Files come in pairs by
+convention: `data.csv` ↔ `data.json`.
+
+Install:
+
+```r
+install.packages("bcsv")
+```
+
+Each recipe below stands on its own. The setup chunk defines `example_path()`,
+which returns the path to a dataset shipped inside the package (the cookbook
+uses `course_feedback`).
+
+```{r setup}
+library(bcsv)
+example_path <- function(name) system.file("extdata", name, package = "bcsv")
+cat("schema", bcsv::SCHEMA_VERSION, "\n")
+```
+
+## Load a typed dataset
+
+`read_bcsv` applies the declared types: `rating` becomes an **ordered** factor,
+`date` a `Date`, `passed` logical.
+
+```{r}
+csv_path <- example_path("course_feedback.csv")
+json_path <- example_path("course_feedback.json")
+
+df <- read_bcsv(csv_path, json_path)
+str(df)
+```
+
+Compare with `read.csv`, which sees only text and numbers—`rating` and `date`
+arrive as untyped character columns:
+
+```{r}
+df_plain <- read.csv(csv_path)
+str(df_plain)
+```
+
+Every column's declared metadata—types, units, levels, descriptions—travels
+in the sidecar. `tabularize()` (alias `tabularise()`) renders it as a table
+(units live here, not on the typed column):
+
+```{r}
+metadata <- jsonlite::fromJSON(json_path, simplifyVector = FALSE)
+tabularize(metadata)
+```
+
+## Ordered factors: why declared levels matter
+
+The payoff of the `ordered` datatype is clearest when the natural order is *not*
+alphabetical—like a satisfaction rating. A plain read sees `rating` as text
+and can only sort it alphabetically, which is meaningless:
+
+```{r}
+sort(unique(read.csv(csv_path)$rating))
+```
+
+Because the metadata declares `rating` as `ordered` with explicit `levels`,
+`read_bcsv` rebuilds the real scale—so sorting and comparisons follow it:
+
+```{r}
+levels(df$rating)
+```
+
+```{r}
+df[df$rating >= "good", c("name", "rating")]
+```
+
+## Validate a pair
+
+`validate_bcsv` returns `valid`, plus `errors` / `warnings` lists and the
+columns it compared—it **collects** issues rather than stopping. The result
+prints itself as a summary (a `print` method built on `tabularize()`); call
+`tabularize(res)` when you want the issues as a data frame. A clean pair has
+no issues:
+
+```{r}
+csv_path <- example_path("course_feedback.csv")
+json_path <- example_path("course_feedback.json")
+
+res <- validate_bcsv(csv_path, json_path)
+res
+```
+
+Now a dataset that violates a declared constraint—`score` is capped at 100 but
+one row is 150. The violation is collected as a warning (so `valid` stays `TRUE`;
+`on_violation = "raise"` would promote it to an error):
+
+```{r}
+tmpdir <- tempfile(); dir.create(tmpdir)   # a throwaway folder for this example's files
+bad_csv <- file.path(tmpdir, "scores.csv")
+readr::write_csv(data.frame(id = 1:2, score = c(88, 150)), bad_csv)
+
+scores_metadata <- document_bcsv(
+  data.frame(id = 1L, score = 0.0),
+  "Exam scores.",
+  data_url = "scores.csv",
+  column_descriptions = list(score = list(maximum = 100))
+)
+jsonlite::write_json(scores_metadata, file.path(tmpdir, "scores.json"),
+                     auto_unbox = TRUE, null = "null")
+
+res <- validate_bcsv(bad_csv, check_hash = FALSE)
+res$valid
+tabularize(res)
+```
+
+## Multiple NA codes
+
+A column can declare extra `na_strings`; the empty string is always NA. They all
+collapse to `NA` uniformly.
+
+Here is a CSV whose `score` column uses several NA tokens:
+
+```{r}
+tmpdir <- tempfile(); dir.create(tmpdir)   # a throwaway folder for this example's files
+csv <- file.path(tmpdir, "scores.csv")
+readr::write_csv(data.frame(id = 1:4, score = c("88", "NA", "-99", "")), csv)
+```
+
+You can write the metadata by hand, or scaffold it from the column types with
+`document_bcsv`—which fills in the field names and rejects invalid ones, so
+typos are caught. The two produce the same column definitions:
+
+```{r}
+by_hand <- list(
+  `@context` = bcsv::CONTEXT_URL, url = "scores.csv",
+  description = "Exam scores.",
+  table_schema = list(columns = list(
+    list(name = "id", datatype = "integer"),
+    list(name = "score", datatype = "number", na_strings = list("NA", "-99"))
+  ))
+)
+scaffolded <- document_bcsv(
+  data.frame(id = 1L, score = 0.0),
+  "Exam scores.",
+  data_url = "scores.csv",
+  column_descriptions = list(score = list(na_strings = list("NA", "-99")))
+)
+identical(scaffolded$table_schema$columns, by_hand$table_schema$columns)
+```
+
+```{r}
+jsonlite::write_json(scaffolded, file.path(tmpdir, "scores.json"), auto_unbox = TRUE, null = "null")
+df <- read_bcsv(csv, check_hash = FALSE)   # hand-made metadata has no file_hash
+df
+```
+
+```{r}
+is.na(df$score)
+class(df$score)
+```
+
+## Lenient vs strict reads
+
+`read_bcsv` defaults to `on_violation = "warn"`: a value that fails coercion
+becomes `NA` with a warning, and the read returns. `on_violation = "raise"`
+stops on the first violation.
+
+```{r}
+tmpdir <- tempfile(); dir.create(tmpdir)   # a throwaway folder for this example's files
+csv <- file.path(tmpdir, "ages.csv")
+readr::write_csv(data.frame(id = 1:3, age = c("25", "thirty", "41")), csv)
+
+meta <- document_bcsv(data.frame(id = 1L, age = 1L), "Participant ages.", data_url = "ages.csv")
+jsonlite::write_json(meta, file.path(tmpdir, "ages.json"), auto_unbox = TRUE, null = "null")
+
+df <- withCallingHandlers(
+  read_bcsv(csv, check_hash = FALSE),
+  warning = function(w) { message("warning: ", conditionMessage(w)); invokeRestart("muffleWarning") }
+)
+df$age
+```
+
+```{r}
+tryCatch(
+  read_bcsv(csv, check_hash = FALSE, on_violation = "raise"),
+  bcsv_validation_error = function(e) paste("strict →", conditionMessage(e))
+)
+```
+
+## Verify file integrity
+
+The metadata carries a SHA-256 `file_hash`. `read_bcsv` recomputes it and raises
+`bcsv_validation_error` on a mismatch—the data has changed since it was
+documented. `check_hash` and `check_schema` are independent toggles.
+
+```{r}
+csv_path <- example_path("course_feedback.csv")
+json_path <- example_path("course_feedback.json")
+
+# The bundled pair is consistent, so it reads without complaint:
+feedback <- read_bcsv(csv_path, json_path)
+head(feedback, 3)   # consistent pair → reads fine
+```
+
+Now edit the data while leaving the metadata's hash stale, and read it back:
+
+```{r}
+tmpdir <- tempfile(); dir.create(tmpdir)   # a throwaway folder for this example's files
+modified_csv <- file.path(tmpdir, "course_feedback.csv")
+file.copy(json_path, file.path(tmpdir, "course_feedback.json"))   # keep the original (stale) hash
+
+data <- read.csv(csv_path)
+data$name[1] <- "Alicia"
+write.csv(data, modified_csv, row.names = FALSE)
+
+tryCatch(
+  read_bcsv(modified_csv),
+  bcsv_validation_error = function(e) paste("integrity →", substr(conditionMessage(e), 1, 60))
+)
+```
+
+```{r}
+# When the change is intentional, skip the integrity check to read it anyway:
+reread <- read_bcsv(modified_csv, check_hash = FALSE)
+head(reread, 3)   # same data, integrity check skipped
+```
+
+## Generate metadata for a data frame
+
+`document_bcsv` infers datatypes from the (already typed) columns and layers in
+`column_descriptions`. The table-level description is a required
+argument—the bcsv schema insists every table describe what it is about.
+
+```{r}
+study_data <- data.frame(
+  agent_id = 1:3,
+  response_time = c(0.45, 0.52, 0.39),
+  correct = c(TRUE, FALSE, TRUE)
+)
+study_metadata <- document_bcsv(
+  study_data,
+  "Reaction-time pilot data.",
+  pretty_name = "Reaction Time Pilot",
+  column_descriptions = list(
+    response_time = list(unit = "s", minimum = 0, description = "Response time"),
+    correct = list(description = "Whether the response was correct")
+  ),
+  primary_key = "agent_id"
+)
+```
+
+```{r}
+tabularize(study_metadata)
+```
+
+Unknown keys are rejected immediately—the allowed key is `unit`, not `units`:
+
+```{r}
+tryCatch(
+  document_bcsv(study_data, "Reaction-time pilot data.", column_descriptions = list(response_time = list(units = "s"))),
+  bcsv_unknown_key_error = function(e) paste("rejected →", substr(conditionMessage(e), 1, 70))
+)
+```
+
+## Write a pair, read it back
+
+`write_bcsv` writes the CSV and metadata atomically and computes the
+`file_hash`. An ordered factor round-trips back ordered.
+
+```{r}
+ratings <- data.frame(
+  agent_id = 1:3,
+  rating = ordered(c("good", "very bad", "very good"), levels = c("very bad", "bad", "good", "very good"))
+)
+ratings_metadata <- document_bcsv(ratings, "Agent satisfaction ratings.", pretty_name = "Ratings", primary_key = "agent_id")
+
+tmpdir <- tempfile(); dir.create(tmpdir)   # a throwaway folder for this example's files
+written <- write_bcsv(ratings, file.path(tmpdir, "ratings.csv"), ratings_metadata)
+written
+```
+
+```{r}
+reloaded <- read_bcsv(written$data)
+is.ordered(reloaded$rating)
+levels(reloaded$rating)
+as.character(reloaded$rating)
+```
+
+## Author metadata for a CSV
+
+When you have a bare CSV, the authoring verbs build its metadata through an
+editable YAML, keeping a **single metadata document** on disk at a time—YAML
+while you edit, JSON once finalized. The directory listing after each step
+shows which: if a step fails, nothing is written, so the files on disk always
+tell you where you are.
+
+`draft_metadata` writes a YAML prefilled from the data: a commented legend of
+the optional column keys, a placeholder for the table description (which the
+bcsv schema **requires**), and one placeholder description per column—exactly
+what you want when a questionnaire CSV has hundreds of columns named like
+`q12r`:
+
+```{r}
+tmpdir <- tempfile(); dir.create(tmpdir)   # a throwaway folder for this example's files
+raw <- file.path(tmpdir, "survey.csv")
+readr::write_csv(data.frame(id = 1:2, score = c(88, 92)), raw)
+
+draft <- draft_metadata(raw)     # writes survey.yaml, prefilled from the data
+cat(readLines(draft), sep = "\n")
+```
+
+(`draft_metadata` also accepts a data frame: `draft_metadata(df, "survey")`
+writes both `survey.csv` and `survey.yaml`.)
+
+Placeholders you never edit are **stripped at finalize time**, so boilerplate
+can't leak into published metadata—and because the table description is
+required, finalizing before describing the table is refused, writing nothing:
+
+```{r}
+res <- suppressMessages(finalize_metadata(raw))   # placeholders untouched → refused
+list.files(tmpdir)               # survey.yaml still there, no survey.json
+```
+
+This is the point where you would open `survey.yaml` in your editor. Here the
+edit is scripted so the vignette runs end-to-end—describe the table, describe
+`score` and cap it; `id` keeps its placeholder deliberately:
+
+```{r}
+meta <- yaml::read_yaml(draft)
+meta$description <- "End-of-course survey scores, spring term."
+meta$table_schema$columns <- lapply(meta$table_schema$columns, function(col) {
+  if (col$name == "score") { col$description <- "Exam score"; col$maximum <- 100 }
+  col
+})
+yaml::write_yaml(meta, draft)
+```
+
+`finalize_metadata` validates the pair, and only on success: standardizes the
+CSV into the canonical bcsv dialect (comma delimiter, no row numbers, LF line
+endings, UTF-8—byte-identical across R and Python), writes `survey.json`
+with a fresh `file_hash`, and removes the YAML:
+
+```{r}
+res <- finalize_metadata(raw)
+list.files(tmpdir)               # survey.yaml replaced by canonical survey.json
+```
+
+The untouched `id` placeholder was stripped rather than published—`id` simply
+has no description in the canonical metadata:
+
+```{r}
+print_metadata(raw)              # the finalized metadata, as a table
+```
+
+Changed your mind? `edit_metadata` converts the JSON back to an editable YAML
+(removing the JSON), and another `finalize_metadata` closes the loop:
+
+```{r}
+edit_metadata(raw)               # survey.json → survey.yaml, ready to edit
+list.files(tmpdir)
+```
+
+```{r}
+res <- finalize_metadata(raw)    # (further YAML edits would go here)
+list.files(tmpdir)
+```
+
+`export_metadata` writes a readable copy under a distinct name—for sharing
+or review—without disturbing the canonical pair:
+
+```{r}
+export <- export_metadata(raw)   # default: YAML; output_format = "json" also works
+list.files(tmpdir)
+```
